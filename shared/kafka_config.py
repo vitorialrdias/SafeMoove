@@ -1,7 +1,7 @@
 from kafka import KafkaProducer, KafkaConsumer
 import json
 
-BOOTSTRAP_SERVERS = "localhost:9092"
+BOOTSTRAP_SERVERS = "kafka:9092"
 
 
 def get_producer():

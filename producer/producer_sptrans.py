@@ -28,7 +28,7 @@ while True:
 
         if payload is None:
             print("Sem dados recebidos")
-            time.sleep(10)
+            time.sleep(30)
             continue
 
         producer.send(
@@ -44,4 +44,4 @@ while True:
 
         print(f"Erro: {e}")
 
-    time.sleep(10)
+    time.sleep(30)

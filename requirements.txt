@@ -1,4 +1,6 @@
 pip
 kafka-python 
+requests
 boto3
 awscli
+dotenv

@@ -11,11 +11,18 @@ def get_producer():
     )
 
 
-def get_consumer(topic, group_id):
+def get_consumer(topics, group_id, enable_auto_commit=True):
+    """
+    topics: string com um único tópico OU lista/tupla de tópicos.
+    """
+    if isinstance(topics, str):
+        topics = [topics]
+
     return KafkaConsumer(
-        topic,
+        *topics,
         bootstrap_servers=BOOTSTRAP_SERVERS,
         auto_offset_reset="earliest",
+        enable_auto_commit=enable_auto_commit,
         group_id=group_id,
         value_deserializer=lambda x: json.loads(x.decode("utf-8"))
     )

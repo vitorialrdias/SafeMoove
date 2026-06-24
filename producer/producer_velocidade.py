@@ -6,8 +6,7 @@ from shared.kafka_config import get_producer
 
 load_dotenv()
 
-TOKEN = os.getenv("TOKEN-SPTRANS")
-
+TOKEN = os.getenv("TOKEN_SPTRANS")
 TOPIC = "sptrans-velocidade"
 
 HEADERS = {
@@ -22,12 +21,18 @@ URL = (
 
 producer = get_producer()
 
-r = requests.get(URL, headers=HEADERS)
+try:
+    r = requests.get(URL, headers=HEADERS, timeout=30)
 
-if r.status_code == 200:
+    if r.status_code == 200:
+        producer.send(TOPIC, r.json())
+        producer.flush()
+        print("Velocidade enviada")
+    else:
+        print(f"Falha ao buscar velocidade: status {r.status_code}")
 
-    producer.send(TOPIC, r.json())
+except requests.exceptions.RequestException as e:
+    print(f"Erro de rede ao buscar velocidade: {e}")
 
-    producer.flush()
-
-print("Velocidade enviada")
+finally:
+    producer.close()

@@ -14,6 +14,11 @@ TOPIC = "sptrans-linhas"
 TOKEN = os.getenv("SafeMooveTOKENolhovivo")
 REQUEST_INTERVAL = float(os.getenv("LINHAS_REQUEST_INTERVAL", "0.8"))
 
+# Limite opcional de linhas a descobrir antes de parar (útil para testes
+# rápidos). Sem essa variável, roda a descoberta completa (padrão de produção).
+MAX_LINHAS = os.getenv("LINHAS_MAX_ENCONTRADAS")
+MAX_LINHAS = int(MAX_LINHAS) if MAX_LINHAS else None
+
 
 def main():
     if not TOKEN:
@@ -87,6 +92,10 @@ def main():
                                 queue.append(variant)
 
                 logger.info(f"{termo} processado ({len(linhas_encontradas)} linhas até agora)")
+
+                if MAX_LINHAS and len(linhas_encontradas) >= MAX_LINHAS:
+                    logger.info(f"Limite de {MAX_LINHAS} linhas atingido, encerrando descoberta.")
+                    break
 
             except Exception as e:
                 logger.error(f"Erro inesperado em {termo}: {e}")

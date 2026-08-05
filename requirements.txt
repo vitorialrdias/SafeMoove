@@ -3,4 +3,4 @@ kafka-python
 requests
 boto3
 awscli
-dotenv
+python-dotenv

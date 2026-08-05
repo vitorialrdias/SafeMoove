@@ -7,7 +7,6 @@ TOPIC_PATH = {
     "sptrans-posicoes": "posicoes",
     "sptrans-previsoes": "previsoes",
     "sptrans-corredores": "corredores",
-    "sptrans-velocidade": "velocidade",
 }
 
 # Partições por tópico (mais frequentes ganham mais partições)
@@ -17,5 +16,4 @@ TOPIC_PARTITIONS = {
     "sptrans-posicoes": 3,
     "sptrans-previsoes": 3,
     "sptrans-corredores": 1,
-    "sptrans-velocidade": 1,
 }

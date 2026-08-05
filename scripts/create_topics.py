@@ -1,9 +1,9 @@
 from kafka.admin import KafkaAdminClient, NewTopic
 from kafka.errors import TopicAlreadyExistsError
 
+from shared.kafka_config import BOOTSTRAP_SERVERS
 from shared.topics import TOPIC_PATH, TOPIC_PARTITIONS
 
-BOOTSTRAP_SERVERS = "kafka:9092"
 REPLICATION_FACTOR = 1
 
 

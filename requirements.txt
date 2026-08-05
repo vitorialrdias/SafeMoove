@@ -1,6 +1,7 @@
 pip
-kafka-python 
+kafka-python
 requests
 boto3
 awscli
 python-dotenv
+pyarrow

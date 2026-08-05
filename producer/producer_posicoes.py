@@ -4,56 +4,63 @@ from dotenv import load_dotenv
 
 from producer.api_sptrans import SPTransAPI
 from shared.kafka_config import get_producer
+from shared.logger import get_logger
 
 load_dotenv()
+logger = get_logger(__name__)
 
-TOKEN = os.getenv("SafeMooveTOKENolhovivo")
 TOPIC = "sptrans-posicoes"
-
+TOKEN = os.getenv("SafeMooveTOKENolhovivo")
 POLL_INTERVAL = int(os.getenv("POSICOES_POLL_INTERVAL", "10"))
 
-if not TOKEN:
-    raise Exception("Token da SPTrans não encontrado no ambiente (.env).")
 
-api = SPTransAPI(TOKEN)
-producer = get_producer()
+def main():
+    if not TOKEN:
+        raise Exception("Token da SPTrans não encontrado no ambiente (.env).")
 
-print("Monitorando posições de todos os veículos em operação...")
+    api = SPTransAPI(TOKEN)
+    producer = get_producer()
 
-while True:
-    try:
-        dados = api.obter_posicoes()
+    logger.info("Monitorando posições de todos os veículos em operação...")
 
-        if dados and isinstance(dados.get("l"), list):
-            horario = dados.get("hr")
-            total_veiculos = 0
+    while True:
+        try:
+            dados = api.obter_posicoes()
 
-            for linha in dados["l"]:
-                for veiculo in linha.get("vs", []):
-                    payload = {
-                        "horario_consulta": horario,
-                        "timestamp_veiculo": veiculo.get("ta"),
-                        "codigo_linha": linha.get("cl"),
-                        "letreiro": linha.get("c"),
-                        "sentido": linha.get("sl"),
-                        "origem": linha.get("lt0"),
-                        "destino": linha.get("lt1"),
-                        "prefixo_veiculo": veiculo.get("p"),
-                        "acessivel": veiculo.get("a"),
-                        "latitude": veiculo.get("py"),
-                        "longitude": veiculo.get("px"),
-                    }
+            if dados and isinstance(dados.get("l"), list):
+                horario = dados.get("hr")
+                total_veiculos = 0
 
-                    producer.send(TOPIC, payload)
-                    total_veiculos += 1
+                for linha in dados["l"]:
+                    for veiculo in linha.get("vs", []):
+                        payload = {
+                            "horario_consulta": horario,
+                            "timestamp_veiculo": veiculo.get("ta"),
+                            "codigo_linha": linha.get("cl"),
+                            "letreiro": linha.get("c"),
+                            "sentido": linha.get("sl"),
+                            "origem": linha.get("lt0"),
+                            "destino": linha.get("lt1"),
+                            "prefixo_veiculo": str(veiculo.get("p")) if veiculo.get("p") is not None else None,
+                            "acessivel": veiculo.get("a"),
+                            "latitude": veiculo.get("py"),
+                            "longitude": veiculo.get("px"),
+                        }
 
-            producer.flush()
-            print(f"Posições enviadas: {total_veiculos} veículos em {len(dados['l'])} linhas.")
-        else:
-            print("Aviso: dados de posição vazios ou sessão expirada. Reautenticando...")
-            api.autenticar()
+                        producer.send(TOPIC, payload)
+                        total_veiculos += 1
 
-    except Exception as e:
-        print(f"Erro ao obter/enviar posições: {e}")
+                producer.flush()
+                logger.info(f"Posições enviadas: {total_veiculos} veículos em {len(dados['l'])} linhas.")
+            else:
+                logger.warning("Dados de posição vazios ou sessão expirada. Reautenticando...")
+                api.autenticar()
 
-    time.sleep(POLL_INTERVAL)
+        except Exception as e:
+            logger.error(f"Erro ao obter/enviar posições: {e}")
+
+        time.sleep(POLL_INTERVAL)
+
+
+if __name__ == "__main__":
+    main()

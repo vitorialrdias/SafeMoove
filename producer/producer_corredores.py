@@ -1,68 +1,43 @@
 import os
-import requests
 from dotenv import load_dotenv
 
+from producer.api_sptrans import SPTransAPI
 from shared.kafka_config import get_producer
+from shared.logger import get_logger
 
 load_dotenv()
+logger = get_logger(__name__)
 
-TOKEN = os.getenv("SafeMooveTOKENolhovivo") or os.getenv("SafeMooveTOKENolhovivo")
 TOPIC = "sptrans-corredores"
+TOKEN = os.getenv("SafeMooveTOKENolhovivo")
 
-BASE_URL = "http://api.olhovivo.sptrans.com.br/v2.1"
 
-# -----------------------------
-# AUTENTICAÇÃO E SESSÃO SPTRANS
-# -----------------------------
-session = requests.Session()
+def main():
+    if not TOKEN:
+        raise Exception("Token da SPTrans não encontrado no ambiente (.env).")
 
-def autenticar_sptrans():
-    """Autentica na API Olho Vivo e armazena os cookies de sessão no objeto `session`."""
-    url_auth = f"{BASE_URL}/Login/Autenticar"
+    api = SPTransAPI(TOKEN)
+    producer = get_producer()
 
-    # POST com o token na URL e data={} para garantir o header Content-Length: 0
-    res = session.post(url_auth, params={"token": TOKEN}, data={})
+    try:
+        dados = api.listar_corredores()
 
-    if res.status_code == 200 and res.text.strip().lower() == "true":
-        print("✔ Autenticação na SPTrans realizada com sucesso!")
-        return True
-    else:
-        print(f"❌ Falha na autenticação: status {res.status_code} - {res.text}")
-        return False
-
-if not TOKEN or not autenticar_sptrans():
-    raise Exception("Não foi possível autenticar na API Olho Vivo. Verifique o token fornecido.")
-
-# -----------------------------
-# PROCESSAMENTO DE CORREDORES
-# -----------------------------
-producer = get_producer()
-url_corredores = f"{BASE_URL}/Corredor"
-
-try:
-    # Usa a sessão autenticada que repassa o cookie apiCredentials automaticamente
-    r = session.get(url_corredores, timeout=30)
-
-    if r.status_code == 200:
-        dados = r.json()
-
-        # Envia cada corredor individualmente ou a lista completa
-        if isinstance(dados, list):
+        if dados:
             for corredor in dados:
-                producer.send(TOPIC, corredor)
+                payload = {
+                    "codigo_corredor": corredor.get("cc"),
+                    "nome_corredor": corredor.get("nc"),
+                }
+                producer.send(TOPIC, payload)
+
+            producer.flush()
+            logger.info(f"Corredores enviados com sucesso! Total: {len(dados)}")
         else:
-            producer.send(TOPIC, dados)
+            logger.warning("Nenhum corredor retornado pela API.")
 
-        producer.flush()
-        print("Corredores enviados com sucesso!")
-    else:
-        print(f"Falha ao buscar corredores: status {r.status_code}")
+    finally:
+        producer.close()
 
-except requests.exceptions.RequestException as e:
-    print(f"Erro de rede ao buscar corredores: {e}")
 
-except Exception as e:
-    print(f"Erro inesperado ao buscar corredores: {e}")
-
-finally:
-    producer.close()
+if __name__ == "__main__":
+    main()

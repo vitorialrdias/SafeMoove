@@ -5,8 +5,7 @@ PRODUCERS = [
     "producer.producer_paradas",
     "producer.producer_posicoes",
     "producer.producer_previsao",
-    "producer.producer_corredores",
-    "producer.producer_velocidade"
+    "producer.producer_corredores"
 ]
 
 print("Iniciando pipeline SPTrans...")

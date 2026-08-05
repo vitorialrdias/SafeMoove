@@ -103,17 +103,6 @@ services:
         condition: service_completed_successfully
     restart: on-failure
 
-  producer-velocidade:
-    build: .
-    command: python -m producer.producer_velocidade
-    env_file: .env
-    depends_on:
-      kafka:
-        condition: service_healthy
-      create-topics:
-        condition: service_completed_successfully
-    restart: on-failure
-
   consumer-s3:
     build: .
     command: python -m consumer.consumer_s3

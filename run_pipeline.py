@@ -20,6 +20,5 @@ for p in PRODUCERS:
 
     processos.append(proc)
 
-# mantém rodando
 for proc in processos:
     proc.wait()

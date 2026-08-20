@@ -169,6 +169,7 @@ Todos os tópicos são gravados como Parquet particionado por `ano=/mes=/dia=` (
 ### `sptrans-previsoes` → `parquet/previsoes/`
 | Campo | Tipo | Descrição |
 |---|---|---|
+| `ciclo` | bigint | contador que incrementa a cada passada completa pelas linhas conhecidas (reinicia a cada restart do producer) |
 | `horario_consulta` | string | horário (HH:MM) da resposta |
 | `codigo_linha` | bigint | FK para `linhas.codigo_linha` |
 | `codigo_parada` | bigint | identificador da parada |

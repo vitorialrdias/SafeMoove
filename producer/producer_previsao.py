@@ -14,7 +14,7 @@ LINHAS_TOPIC = "sptrans-linhas"
 TOKEN = os.getenv("SafeMooveTOKENolhovivo")
 
 REQUEST_INTERVAL = float(os.getenv("PREVISOES_REQUEST_INTERVAL", "1.0"))
-REFRESH_INTERVAL = int(os.getenv("PREVISOES_REFRESH_INTERVAL", "300"))
+REFRESH_INTERVAL = int(os.getenv("PREVISOES_REFRESH_INTERVAL", "100"))
 
 
 def atualizar_linhas_conhecidas(linhas_consumer, linhas_conhecidas):
@@ -28,7 +28,7 @@ def atualizar_linhas_conhecidas(linhas_consumer, linhas_conhecidas):
                 linhas_conhecidas[codigo] = msg.value
 
 
-def achatar_previsao(previsao, codigo_linha):
+def achatar_previsao(previsao, codigo_linha, ciclo):
     """
     /Previsao/Linha retorna aninhado:
     {hr, ps: [{cp, np, py, px, vs: [{p, t, a, ta, py, px}]}]}
@@ -40,6 +40,7 @@ def achatar_previsao(previsao, codigo_linha):
     for parada in previsao.get("ps", []):
         for veiculo in parada.get("vs", []):
             registros.append({
+                "ciclo": ciclo,
                 "horario_consulta": horario_consulta,
                 "codigo_linha": codigo_linha,
                 "codigo_parada": parada.get("cp"),
@@ -84,14 +85,17 @@ def main():
     logger.info(f"{len(linhas_conhecidas)} linhas conhecidas. Iniciando ciclo de previsões...")
 
     ultimo_refresh = time.time()
+    ciclo = 0
 
     while True:
+        ciclo += 1
+
         for codigo_linha in list(linhas_conhecidas.keys()):
             try:
                 previsao = api.obter_previsao(codigo_linha)
 
                 if previsao:
-                    for registro in achatar_previsao(previsao, codigo_linha):
+                    for registro in achatar_previsao(previsao, codigo_linha, ciclo):
                         producer.send(TOPIC, registro)
 
             except Exception as e:
@@ -100,7 +104,7 @@ def main():
             time.sleep(REQUEST_INTERVAL)
 
         producer.flush()
-        logger.info(f"Ciclo completo de previsões ({len(linhas_conhecidas)} linhas).")
+        logger.info(f"Ciclo {ciclo} completo de previsões ({len(linhas_conhecidas)} linhas).")
 
         if time.time() - ultimo_refresh >= REFRESH_INTERVAL:
             atualizar_linhas_conhecidas(linhas_consumer, linhas_conhecidas)

@@ -24,6 +24,7 @@ SCHEMAS = {
         ("longitude", pa.float64()),
     ]),
     "sptrans-previsoes": pa.schema([
+        ("ciclo", pa.int64()),
         ("horario_consulta", pa.string()),
         ("codigo_linha", pa.int64()),
         ("codigo_parada", pa.int64()),

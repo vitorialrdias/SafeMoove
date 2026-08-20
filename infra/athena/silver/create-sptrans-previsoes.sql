@@ -1,4 +1,5 @@
 CREATE EXTERNAL TABLE IF NOT EXISTS silver.previsoes (
+  ciclo bigint,
   horario_consulta string,
   codigo_linha bigint,
   codigo_parada bigint,

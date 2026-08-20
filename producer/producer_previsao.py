@@ -64,8 +64,7 @@ def main():
     api = SPTransAPI(TOKEN)
     producer = get_producer()
 
-    # Consumer próprio (group_id dedicado) para ler o cadastro de linhas
-    # publicado pelo producer_linhas, sem interferir no consumer_s3.
+    # group_id proprio para nao interferir no offset do consumer_s3
     linhas_consumer = get_consumer(
         LINHAS_TOPIC,
         group_id="previsao-linhas-reader",

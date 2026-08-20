@@ -14,8 +14,7 @@ TOPIC = "sptrans-linhas"
 TOKEN = os.getenv("SafeMooveTOKENolhovivo")
 REQUEST_INTERVAL = float(os.getenv("LINHAS_REQUEST_INTERVAL", "0.8"))
 
-# Limite opcional de linhas a descobrir antes de parar (útil para testes
-# rápidos). Sem essa variável, roda a descoberta completa (padrão de produção).
+# sem valor, roda a descoberta completa (padrão de produção)
 MAX_LINHAS = os.getenv("LINHAS_MAX_ENCONTRADAS")
 MAX_LINHAS = int(MAX_LINHAS) if MAX_LINHAS else None
 
@@ -31,18 +30,12 @@ def main():
     seen_terms = set()
     queue = deque()
 
-    # -----------------------------
-    # SEEDS INICIAIS REALISTAS
-    # -----------------------------
     for i in range(10000):
         queue.append(str(i))
 
     for p in list("NABCDEFGHIJR"):
         queue.append(p)
 
-    # -----------------------------
-    # PROCESSAMENTO DA FILA
-    # -----------------------------
     try:
         while queue:
             termo = queue.popleft()
@@ -76,15 +69,12 @@ def main():
 
                         logger.info(f"encontrada: {linha.get('lt')}")
 
-                        # -----------------------------
-                        # EXPANSÃO INTELIGENTE
-                        # -----------------------------
                         lt = linha.get("lt")
 
                         if lt and lt not in seen_terms:
                             queue.append(lt)
 
-                        # Tenta variações reais de linha (ex: 546J-10)
+                        # variações reais de linha, ex: 546J-10
                         tl = linha.get("tl")
                         if lt and tl is not None:
                             variant = f"{lt}-{tl}"

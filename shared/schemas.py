@@ -1,10 +1,8 @@
 import pyarrow as pa
 
-# Schema fixo por tópico, usado pelo consumer_s3 ao gravar Parquet.
-# Evita que o pyarrow infira dtypes diferentes entre batches do mesmo
-# tópico (o que gera arquivos com schemas incompatíveis no mesmo
-# particionamento e quebra leitura no Athena).
-
+# schema fixo por tópico, usado pelo consumer_s3 ao gravar Parquet — evita
+# schemas incompatíveis entre batches do mesmo tópico, o que quebraria
+# leitura no Athena
 SCHEMAS = {
     "sptrans-linhas": pa.schema([
         ("codigo_linha", pa.int64()),

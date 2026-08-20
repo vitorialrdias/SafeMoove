@@ -14,8 +14,8 @@ class SPTransAPI:
         self.base_url = "http://api.olhovivo.sptrans.com.br/v2.1"
         self.session = requests.Session()
 
-        # allowed_methods inclui POST (o default do Retry exclui POST,
-        # o que deixaria a re-autenticação sem retry em falhas transitórias)
+        # allowed_methods inclui POST — o default do Retry o exclui, o que
+        # deixaria a re-autenticação sem retry
         retries = Retry(
             total=3,
             backoff_factor=0.5,
@@ -29,7 +29,6 @@ class SPTransAPI:
         self.autenticar()
 
     def autenticar(self):
-        """Autentica na API e armazena os cookies na sessão."""
         url = f"{self.base_url}/Login/Autenticar"
 
         # Passa data={} para evitar erro '411 Length Required'
@@ -42,7 +41,6 @@ class SPTransAPI:
         return True
 
     def buscar_linhas(self, termo):
-        """Busca linhas por termo (número, letreiro, prefixo etc.)."""
         url = f"{self.base_url}/Linha/Buscar"
         r = self.session.get(url, params={"termosBusca": termo}, timeout=30)
 
@@ -60,11 +58,9 @@ class SPTransAPI:
             logger.warning(f"Linha '{linha}' não encontrada.")
             return None
 
-        # Retorna o código da primeira linha encontrada
         return dados[0].get("cl")
 
     def obter_previsao(self, codigo_linha):
-        """Busca as previsões de chegada para uma linha específica."""
         url = f"{self.base_url}/Previsao/Linha"
         r = self.session.get(url, params={"codigoLinha": codigo_linha}, timeout=30)
 
@@ -75,7 +71,6 @@ class SPTransAPI:
         return r.json()
 
     def obter_posicoes(self):
-        """Busca a posição de todos os veículos em operação, para todas as linhas."""
         url = f"{self.base_url}/Posicao"
         r = self.session.get(url, timeout=30)
 

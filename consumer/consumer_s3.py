@@ -31,8 +31,6 @@ def _handle_shutdown(signum, frame):
 
 
 def flush_topic(consumer, s3, topic, buffers, pending_offsets):
-    """Grava o buffer do tópico como um único arquivo Parquet no S3 e só
-    então avança o offset das partições envolvidas (nunca antes)."""
     records = buffers.get(topic)
     if not records:
         return
@@ -58,9 +56,8 @@ def flush_topic(consumer, s3, topic, buffers, pending_offsets):
         ContentType="application/octet-stream",
     )
 
-    # Só avança o offset das partições que acabaram de ser gravadas com
-    # sucesso — nunca um consumer.commit() sem args, que avançaria a
-    # posição de OUTROS tópicos com buffer ainda não persistido no S3.
+    # nunca consumer.commit() sem args — avançaria tambem a posição de
+    # outros tópicos com buffer ainda não persistido no S3
     offsets = {
         TopicPartition(topic, partition): OffsetAndMetadata(offset + 1, "")
         for partition, offset in pending_offsets[topic].items()

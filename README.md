@@ -179,7 +179,7 @@ Todos os tópicos são gravados como Parquet particionado por `ano=/mes=/dia=` (
 | `timestamp_previsao` | string | timestamp ISO 8601 de quando a previsão foi gerada |
 | `latitude_veiculo` / `longitude_veiculo` | double | posição do veículo no momento da previsão |
 
-A API não expõe horário programado, só previsão em tempo real. "Atraso" não é um campo direto — é derivado comparando como `horario_previsto` muda para o mesmo (linha, parada, veículo) entre leituras sucessivas. Ver [Limitações](#limitações-conhecidas).
+A API não expõe horário programado, só previsão em tempo real, e só lista veículos que ainda não chegaram — uma leitura isolada nunca mostra um horário já passado. "Atraso" é reconstruído em `gold.atraso_por_linha` a partir de `ciclo`: agrupa leituras consecutivas do mesmo (linha, parada, veículo) em "viagens" (gaps and islands sobre `ciclo`), e mede a diferença entre a primeira previsão da viagem e a última leitura antes do veículo sumir da lista. Ver [Limitações](#limitações-conhecidas).
 
 ## Camada de analytics (Athena/Glue)
 
@@ -190,10 +190,10 @@ Segue o padrão medallion, um database por camada no Glue Data Catalog:
 
 Databases separados por camada, não um só — a vantagem é governança: dá pra conceder acesso somente ao `gold` para quem consome dashboard, sem expor o dado cru. Todas as tabelas usam partition projection (evita `MSCK REPAIR TABLE` a cada novo dia); atenção ao `digits = '2'` em mês/dia, já que os arquivos no S3 são gravados com zero à esquerda.
 
-| Tabela gold | Status | Responde |
-|---|---|---|
-| `gold.onibus_dia_tipo` | pronta | quantos ônibus (veículos distintos) rodam por dia, por tipo de linha |
-| `gold.atraso_por_linha` | em desenvolvimento | quais linhas têm maior atraso |
+| Tabela gold | Responde |
+|---|---|
+| `gold.onibus_dia_tipo` | quantos ônibus (veículos distintos) rodam por dia, por tipo de linha |
+| `gold.atraso_por_linha` | quais linhas têm maior atraso — construída sobre `id_viagem` (linha+parada+veículo+nº da viagem), atraso mínimo observado por viagem, agregado por linha |
 
 Para criar: abrir o `.sql` correspondente, colar no Athena Query Editor, rodar. As 3 tabelas `silver` precisam existir antes de qualquer `gold`, já que os CTAS fazem `JOIN`/`SELECT` sobre elas. IAM necessário: `glue:CreateDatabase/CreateTable`, `athena:StartQueryExecution/GetQueryExecution/GetQueryResults`, leitura/escrita nos buckets de dados e de resultados do Athena.
 
@@ -203,7 +203,7 @@ QuickSight conecta direto no Glue Catalog/Athena, sem mover dado: **New dataset 
 
 ## Limitações conhecidas
 
-- **Atraso é um proxy, não uma métrica direta.** Sem horário programado exposto pela API, atraso é estimado observando se `horario_previsto` empurra pra frente entre leituras. Um cálculo rigoroso exigiria cruzar com o GTFS estático da SPTrans — não implementado.
+- **Atraso é um mínimo observado, não o valor exato.** Sem horário programado nem evento de chegada expostos pela API, `gold.atraso_por_linha` mede até a última leitura em que o veículo ainda aparecia "a caminho" — a chegada real pode ter sido depois disso. Um cálculo exato exigiria cruzar com o GTFS estático da SPTrans — não implementado.
 - **Descoberta de linhas é força bruta.** Cobertura completa depende de rodar `producer_linhas` sem `LINHAS_MAX_ENCONTRADAS`, o que leva horas.
 - **Semântica at-least-once.** Falha entre a gravação no S3 e o commit do offset reprocessa o lote no restart — pode duplicar até um batch inteiro. Deduplicação, se necessária, fica por conta da consulta.
 - **Não há endpoint de velocidade** na API pública Olho Vivo — um producer anterior que usava `/Velocidade` foi removido após confirmar 404.

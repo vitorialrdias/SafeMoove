@@ -15,12 +15,6 @@ SCHEMAS = {
         ("origem", pa.string()),
         ("destino", pa.string()),
     ]),
-    "sptrans-paradas": pa.schema([
-        ("codigo_parada", pa.int64()),
-        ("nome", pa.string()),
-        ("latitude", pa.float64()),
-        ("longitude", pa.float64()),
-    ]),
     "sptrans-posicoes": pa.schema([
         ("horario_consulta", pa.string()),
         ("timestamp_veiculo", pa.string()),
@@ -47,9 +41,5 @@ SCHEMAS = {
         ("timestamp_previsao", pa.string()),
         ("latitude_veiculo", pa.float64()),
         ("longitude_veiculo", pa.float64()),
-    ]),
-    "sptrans-corredores": pa.schema([
-        ("codigo_corredor", pa.int64()),
-        ("nome_corredor", pa.string()),
     ]),
 }

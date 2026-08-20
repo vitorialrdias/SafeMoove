@@ -63,29 +63,6 @@ class SPTransAPI:
         # Retorna o código da primeira linha encontrada
         return dados[0].get("cl")
 
-    def buscar_paradas(self, termo):
-        """Busca paradas por termo (nome, endereço etc.)."""
-        url = f"{self.base_url}/Parada/Buscar"
-        r = self.session.get(url, params={"termosBusca": termo}, timeout=30)
-
-        if r.status_code != 200:
-            logger.warning(f"Erro ao buscar paradas '{termo}': status {r.status_code}")
-            return None
-
-        dados = r.json()
-        return dados if isinstance(dados, list) else None
-
-    def listar_corredores(self):
-        """Lista todos os corredores de ônibus."""
-        url = f"{self.base_url}/Corredor"
-        r = self.session.get(url, timeout=30)
-
-        if r.status_code != 200:
-            logger.warning(f"Falha ao buscar corredores: status {r.status_code}")
-            return None
-
-        return r.json()
-
     def obter_previsao(self, codigo_linha):
         """Busca as previsões de chegada para uma linha específica."""
         url = f"{self.base_url}/Previsao/Linha"

@@ -59,17 +59,6 @@ services:
         condition: service_completed_successfully
     restart: on-failure
 
-  producer-paradas:
-    build: .
-    command: python -m producer.producer_paradas
-    env_file: .env
-    depends_on:
-      kafka:
-        condition: service_healthy
-      create-topics:
-        condition: service_completed_successfully
-    restart: on-failure
-
   producer-posicoes:
     build: .
     command: python -m producer.producer_posicoes
@@ -84,17 +73,6 @@ services:
   producer-previsoes:
     build: .
     command: python -m producer.producer_previsao
-    env_file: .env
-    depends_on:
-      kafka:
-        condition: service_healthy
-      create-topics:
-        condition: service_completed_successfully
-    restart: on-failure
-
-  producer-corredores:
-    build: .
-    command: python -m producer.producer_corredores
     env_file: .env
     depends_on:
       kafka:

@@ -2,10 +2,8 @@ import subprocess
 
 PRODUCERS = [
     "producer.producer_linhas",
-    "producer.producer_paradas",
     "producer.producer_posicoes",
     "producer.producer_previsao",
-    "producer.producer_corredores"
 ]
 
 print("Iniciando pipeline SPTrans...")

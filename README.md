@@ -107,6 +107,10 @@ SafeMoove/
 ├── run_pipeline.py            # alternativa ao compose: sobe os 3 producers localmente
 ├── .env.example                # template de variáveis de ambiente
 │
+├── infra/athena/
+│   ├── silver/                 # DDL das tabelas raw (uma por tópico)
+│   └── gold/                   # CTAS das tabelas agregadas (uma por pergunta de negócio)
+│
 ├── producer/
 │   ├── __init__.py            # vazio de propósito (ver Notas de implementação)
 │   ├── api_sptrans.py          # client HTTP único para a API Olho Vivo
@@ -178,26 +182,23 @@ A API não expõe horário programado, só previsão em tempo real. "Atraso" nã
 
 ## Camada de analytics (Athena/Glue)
 
-O S3 já está particionado em formato Hive (`ano=/mes=/dia=`), compatível nativamente com Athena. Abordagem: um database no Glue Data Catalog (`safemoove`) com uma tabela externa por tópico, usando partition projection para não depender de `MSCK REPAIR TABLE` a cada novo dia. Exemplo para `linhas`:
+Segue o padrão medallion, um database por camada no Glue Data Catalog:
 
-```sql
-CREATE EXTERNAL TABLE safemoove.linhas (
-  codigo_linha bigint, circular boolean, letreiro string,
-  sentido bigint, tipo bigint, origem string, destino string
-)
-PARTITIONED BY (ano int, mes int, dia int)
-STORED AS PARQUET
-LOCATION 's3://<bucket>/parquet/linhas/'
-TBLPROPERTIES (
-  'projection.enabled' = 'true',
-  'projection.ano.type' = 'integer', 'projection.ano.range' = '2024,2030',
-  'projection.mes.type' = 'integer', 'projection.mes.range' = '1,12', 'projection.mes.digits' = '2',
-  'projection.dia.type' = 'integer', 'projection.dia.range' = '1,31', 'projection.dia.digits' = '2',
-  'storage.location.template' = 's3://<bucket>/parquet/linhas/ano=${ano}/mes=${mes}/dia=${dia}/'
-);
-```
+- **`silver`** — dado raw, uma tabela por tópico (`linhas`, `posicoes`, `previsoes`), schema fiel ao Parquet gravado pelo `consumer_s3`. DDL versionado em `infra/athena/silver/`.
+- **`gold`** — tabelas agregadas, uma por pergunta de negócio, criadas via `CREATE TABLE ... AS SELECT` a partir de `silver`. DDL em `infra/athena/gold/`.
 
-Repetir para `posicoes` e `previsoes` (colunas conforme [Modelo de dados](#modelo-de-dados)). O IAM usado precisa de `glue:CreateDatabase/CreateTable`, `athena:StartQueryExecution/GetQueryExecution/GetQueryResults`, e leitura/escrita nos buckets de dados e de resultados do Athena.
+Databases separados por camada, não um só — a vantagem é governança: dá pra conceder acesso somente ao `gold` para quem consome dashboard, sem expor o dado cru. Todas as tabelas usam partition projection (evita `MSCK REPAIR TABLE` a cada novo dia); atenção ao `digits = '2'` em mês/dia, já que os arquivos no S3 são gravados com zero à esquerda.
+
+| Tabela gold | Status | Responde |
+|---|---|---|
+| `gold.onibus_dia_tipo` | pronta | quantos ônibus (veículos distintos) rodam por dia, por tipo de linha |
+| `gold.atraso_por_linha` | em desenvolvimento | quais linhas têm maior atraso |
+
+Para criar: abrir o `.sql` correspondente, colar no Athena Query Editor, rodar. As 3 tabelas `silver` precisam existir antes de qualquer `gold`, já que os CTAS fazem `JOIN`/`SELECT` sobre elas. IAM necessário: `glue:CreateDatabase/CreateTable`, `athena:StartQueryExecution/GetQueryExecution/GetQueryResults`, leitura/escrita nos buckets de dados e de resultados do Athena.
+
+### Dashboard
+
+QuickSight conecta direto no Glue Catalog/Athena, sem mover dado: **New dataset → Athena → tabela em `gold` → importar para SPICE → Visualize → Publish dashboard**. Requer habilitar QuickSight na conta (assinatura própria, não incluída no que já está provisionado — a partir de ~US$12-24/mês por autor). Alternativa sem custo recorrente: Metabase self-hosted, conectado via driver JDBC do Athena.
 
 ## Limitações conhecidas
 

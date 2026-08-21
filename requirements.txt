@@ -6,3 +6,4 @@ awscli
 python-dotenv
 pyarrow
 tzdata
+pandas

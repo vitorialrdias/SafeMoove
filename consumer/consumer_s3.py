@@ -3,7 +3,8 @@ import os
 import signal
 import time
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -16,6 +17,11 @@ from shared.schemas import SCHEMAS
 from shared.logger import get_logger
 
 logger = get_logger(__name__)
+
+# partição por dia local de SP, não UTC — horario_consulta/horario_previsto
+# da API tambem sao hora local; em UTC, a partir das 21h (BRT) a data já
+# vira o dia seguinte, descasando do horario que os campos mostram
+TZ_SP = ZoneInfo("America/Sao_Paulo")
 
 BUCKET = os.getenv("S3_BUCKET", "safe-moove-raw")
 BATCH_SIZE = int(os.getenv("S3_BATCH_SIZE", "500"))
@@ -42,7 +48,7 @@ def flush_topic(consumer, s3, topic, buffers, pending_offsets):
     buf.seek(0)
 
     pasta = TOPIC_PATH.get(topic, "unknown")
-    agora = datetime.now(timezone.utc)
+    agora = datetime.now(TZ_SP)
     key = (
         f"parquet/{pasta}/"
         f"ano={agora:%Y}/mes={agora:%m}/dia={agora:%d}/"

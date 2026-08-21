@@ -107,9 +107,11 @@ SafeMoove/
 ├── run_pipeline.py            # alternativa ao compose: sobe os 3 producers localmente
 ├── .env.example                # template de variáveis de ambiente
 │
-├── infra/athena/
-│   ├── silver/                 # DDL das tabelas raw (uma por tópico)
-│   └── gold/                   # CTAS das tabelas agregadas (uma por pergunta de negócio)
+├── infra/
+│   ├── athena/
+│   │   ├── silver/             # DDL das tabelas raw (uma por tópico)
+│   │   └── gold/                # CTAS das tabelas agregadas (uma por pergunta de negócio)
+│   └── lambda/refresh_gold/     # recria as tabelas gold periodicamente (EventBridge Scheduler)
 │
 ├── producer/
 │   ├── __init__.py            # vazio de propósito (ver Notas de implementação)
@@ -140,10 +142,11 @@ SafeMoove/
 - **`producer_linhas.py` descobre linhas por força bruta.** A API não tem endpoint "listar todas", só busca por termo. O producer varre ~10.000 termos numéricos + prefixos e expande com os letreiros encontrados. `LINHAS_MAX_ENCONTRADAS` corta a busca cedo, útil em testes.
 - **`producer_previsao.py` consome `sptrans-linhas`** para saber quais linhas existem, já que `/Previsao/Linha` só responde por linha. Achata a resposta aninhada (parada → veículos previstos) em uma mensagem por par.
 - **`consumer_s3.py` faz commit de offset por partição, nunca genérico.** Buffer em memória por tópico, flush para um único Parquet ao atingir `S3_BATCH_SIZE` ou `S3_BATCH_INTERVAL_SECONDS`. Um `commit()` sem argumento avançaria a posição de outros tópicos com buffer ainda não gravado — por isso o commit é sempre restrito às partições do tópico recém-persistido. Trata `SIGTERM`/`SIGINT` com flush do que estiver pendente antes de encerrar.
+- **`consumer_s3.py` particiona por hora local de SP, não UTC.** `horario_consulta`/`horario_previsto` da API já são hora local; gravar a partição em UTC faria qualquer leitura depois das 21h (BRT) cair na data do dia seguinte, descasando do horário que os próprios campos mostram.
 
 ## Modelo de dados
 
-Todos os tópicos são gravados como Parquet particionado por `ano=/mes=/dia=` (UTC, sempre 2 dígitos em mês/dia).
+Todos os tópicos são gravados como Parquet particionado por `ano=/mes=/dia=` (hora local de São Paulo, sempre 2 dígitos em mês/dia).
 
 ### `sptrans-linhas` → `parquet/linhas/`
 | Campo | Tipo | Descrição |
@@ -195,7 +198,13 @@ Databases separados por camada, não um só — a vantagem é governança: dá p
 | `gold.onibus_dia_tipo` | quantos ônibus (veículos distintos) rodam por dia, por tipo de linha |
 | `gold.atraso_por_linha` | quais linhas têm maior atraso — construída sobre `id_viagem` (linha+parada+veículo+nº da viagem), atraso mínimo observado por viagem, agregado por linha |
 
-Para criar: abrir o `.sql` correspondente, colar no Athena Query Editor, rodar. As 3 tabelas `silver` precisam existir antes de qualquer `gold`, já que os CTAS fazem `JOIN`/`SELECT` sobre elas. IAM necessário: `glue:CreateDatabase/CreateTable`, `athena:StartQueryExecution/GetQueryExecution/GetQueryResults`, leitura/escrita nos buckets de dados e de resultados do Athena.
+Para criar manualmente: abrir o `.sql` correspondente, colar no Athena Query Editor, rodar. As 3 tabelas `silver` precisam existir antes de qualquer `gold`, já que os CTAS fazem `JOIN`/`SELECT` sobre elas. IAM necessário: `glue:CreateDatabase/CreateTable`, `athena:StartQueryExecution/GetQueryExecution/GetQueryResults`, leitura/escrita nos buckets de dados e de resultados do Athena. Todo `.sql` de `gold/` começa com `DROP TABLE IF EXISTS` — sem isso o `CREATE TABLE` seguinte falha com `TABLE_ALREADY_EXISTS` se a tabela já existir.
+
+### Atualização automática
+
+CTAS não é reativo — sem algo disparando de novo, `gold` fica com o dado congelado no momento em que foi criado. `infra/lambda/refresh_gold/` tem uma Lambda (`safemoove-refresh-gold`) que reexecuta o DROP+CREATE das duas tabelas gold a partir do `silver` atual, com um EventBridge Scheduler chamando ela a cada 30 minutos (`rate(30 minutes)`).
+
+A Lambda limpa o prefixo S3 de cada tabela antes de recriar (`DROP TABLE` não apaga o dado, só o catálogo — sem isso o `CREATE TABLE` falha com `HIVE_PATH_ALREADY_EXISTS`). Lê os `.sql` de `infra/athena/gold/` empacotados junto no deploy — fonte única, sem duplicar query em string Python. `infra/lambda/refresh_gold/deploy.py` automatiza a criação da role/função/agendamento via boto3, mas exige permissão de IAM/Lambda/EventBridge na conta; a role de execução (`safemoove-refresh-gold-role-*`) precisa confiar em **dois** serviços (`lambda.amazonaws.com` e `scheduler.amazonaws.com`) e ter política de S3 (incluindo `s3:GetBucketLocation`, que o Athena exige pro bucket de resultados) + Athena + Glue.
 
 ### Dashboard
 
@@ -216,3 +225,7 @@ QuickSight conecta direto no Glue Catalog/Athena, sem mover dado: **New dataset 
 | `producer_previsao` preso em "Aguardando linhas publicadas..." | `producer_linhas` ainda não publicou nada ou não está rodando |
 | Query no Athena retorna 0 linhas com dados no S3 | Checar `projection.mes.digits`/`projection.dia.digits` = `2` — arquivos são gravados com zero à esquerda (`mes=08`) |
 | `consumer_s3` loga erro de escrita e não avança offset | Esperado — a mensagem é reprocessada no próximo restart, não foi perdida |
+| CTAS falha com `TABLE_ALREADY_EXISTS` | Falta `DROP TABLE IF EXISTS` no início do `.sql` |
+| CTAS falha com `HIVE_PATH_ALREADY_EXISTS` | `DROP TABLE` não apagou o dado no S3 (só o catálogo) — limpar o prefixo da tabela manualmente antes de recriar |
+| Lambda: `The execution role... must allow AWS EventBridge Scheduler to assume the role` | Trust policy da role só confia em `lambda.amazonaws.com` — precisa incluir `scheduler.amazonaws.com` também (os dois, não substituir um pelo outro) |
+| Athena: `Unable to verify/create output bucket` | Falta `s3:GetBucketLocation` na policy da role, além de `GetObject`/`PutObject`/`ListBucket` |

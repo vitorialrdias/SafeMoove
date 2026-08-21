@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS gold.onibus_dia_tipo;
+
 CREATE TABLE gold.onibus_dia_tipo
 WITH (
   format = 'PARQUET',

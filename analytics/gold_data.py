@@ -3,9 +3,11 @@ import time
 
 import boto3
 import pandas as pd
+from dotenv import load_dotenv
 
 from shared.logger import get_logger
 
+load_dotenv()
 logger = get_logger(__name__)
 
 REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-1")

@@ -17,6 +17,8 @@ RESULTS_BUCKET = os.getenv("ATHENA_RESULTS_BUCKET")
 _athena_client = None
 
 
+# --- client Athena -----------------------------------------------------
+
 def _get_athena_client():
     global _athena_client
     if _athena_client is None:
@@ -78,10 +80,37 @@ def executar_query(sql, database=DATABASE):
     return _resultado_para_dataframe(query_id)
 
 
+# --- domínio -------------------------------------------------------------
+# Classificação da numeração de linhas de SP definida pela CMTC (doc.
+# oficial SPTrans confirma 10 e 21/23/32/41; faixas completas 21-59
+# confirmadas por fontes externas sobre a lógica de numeração). Código
+# fora dessas faixas mantém o número original, sem rótulo inventado.
+
+def classificar_tipo_linha(codigo):
+    if codigo == 10:
+        return "Principal"
+    if codigo == 11:
+        return "Noturna"
+    if 21 <= codigo <= 29:
+        return "Retorno"
+    if 31 <= codigo <= 39:
+        return "Derivação"
+    if 41 <= codigo <= 49:
+        return "Bifurcação"
+    if 51 <= codigo <= 59:
+        return "Prolongamento"
+    return str(codigo)
+
+
+# --- loaders ---------------------------------------------------------------
+
 def carregar_onibus_por_dia_tipo():
-    """gold.onibus_dia_tipo -- veículos distintos por dia, por tipo de linha."""
+    """gold.onibus_dia_tipo -- veículos distintos por dia, por tipo de linha
+    (tipo_linha já vem classificado em rótulo legível, ver classificar_tipo_linha)."""
     logger.info("Consultando gold.onibus_dia_tipo...")
-    return executar_query("SELECT * FROM gold.onibus_dia_tipo")
+    df = executar_query("SELECT * FROM gold.onibus_dia_tipo")
+    df["tipo_linha"] = df["tipo_linha"].apply(classificar_tipo_linha)
+    return df
 
 
 def carregar_atraso_por_linha():

@@ -1,7 +1,10 @@
 import streamlit as st
 import plotly.express as px
 
-from analytics.gold_data import carregar_onibus_por_dia_tipo, carregar_atraso_por_linha
+from analytics.gold_data import (
+    carregar_onibus_por_dia_tipo,
+    carregar_atraso_por_linha,
+)
 
 # paleta validada (dataviz skill, references/palette.md) — slots 1/2 do
 # categórico (azul/laranja), superfície e tinta do tema claro
@@ -52,6 +55,17 @@ st.divider()
 
 # --- Ônibus por tipo de linha, por dia ---
 st.subheader("Ônibus por tipo de linha")
+
+# mapeamento confirmado na documentação oficial da SPTrans (tl = BASE/ATENDIMENTO);
+# códigos fora dessa lista não são documentados publicamente, mantidos como estão
+MAPA_TIPO_LINHA = {
+    10: "principal",
+    21: "atendimento",
+    23: "atendimento",
+    32: "atendimento",
+    41: "atendimento",
+}
+onibus["tipo_linha"] = onibus["tipo_linha"].map(MAPA_TIPO_LINHA).fillna(onibus["tipo_linha"].astype(str))
 
 fig_onibus = px.bar(
     onibus.sort_values("tipo_linha"),
